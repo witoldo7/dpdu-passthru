@@ -24,16 +24,10 @@
     <ClInclude Include="pdu_api.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="macchina_dpdu_dll.h">
+    <ClInclude Include="Logger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="macchina_dpdu.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="typedefs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Logger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
