@@ -78,7 +78,7 @@ std::string Logger::bytesToString(uint8_t* bytes, unsigned long len) {
 	LOGGER.logDebug("LB", "%lu bytes", len);
 	char buf[4] = { 0x00 };
 	for (int i = 0; i < len; i++) {
-		sprintf(buf, "%02X ", bytes[i]);
+		sprintf_s(buf, "%02X ", bytes[i]);
 		ret += buf;
 	}
 	return ret;
