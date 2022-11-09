@@ -2,8 +2,13 @@
 #include "macchina_dpdu.h"
 #include "Logger.h"
 #include "pdu_api.h"
+#include "j2534/shim_loader.h"
 #include <chrono>
+#include <vector>
+#include <string>
 
+static std::vector<cPassThruInfo> m_registryList;
+static unsigned long m_pDeviceID = 0;
 
 T_PDU_ERROR __stdcall PDUConstruct(CHAR8* OptionStr, void* pAPITag)
 {
@@ -24,8 +29,28 @@ T_PDU_ERROR __stdcall PDUDestruct()
 
 T_PDU_ERROR __stdcall PDUModuleConnect(UNUM32 hMod)
 {
-	LOGGER.logWarn("STUB", "PDUModuleConnect is unimplimented");
-	return PDU_STATUS_NOERROR;
+	T_PDU_ERROR ret = PDU_STATUS_NOERROR;
+
+	LOGGER.logWarn("PDUModuleConnect", "Connecting to module: %u, library: %s", hMod, m_registryList[hMod].FunctionLibrary.c_str());
+
+	bool sret = shim_loadLibrary(m_registryList[hMod].FunctionLibrary.c_str());
+	if (!sret)
+	{
+		LOGGER.logWarn("PDUModuleConnect", "shim_loadLibrary failed");
+		ret = PDU_ERR_MODULE_NOT_CONNECTED;
+	}
+
+	if (ret == PDU_STATUS_NOERROR)
+	{
+		long ptret = _PassThruOpen(NULL, &m_pDeviceID);
+		if (ptret != STATUS_NOERROR)
+		{
+			LOGGER.logWarn("PDUModuleConnect", "_PassThruOpen failed: %d", ptret);
+			ret = PDU_ERR_MODULE_NOT_CONNECTED;
+		}
+	}
+
+	return ret;
 }
 
 T_PDU_ERROR __stdcall PDUModuleDisconnect(UNUM32 hMod)
@@ -42,7 +67,7 @@ T_PDU_ERROR __stdcall PDUGetTimestamp(UNUM32 hMod, UNUM32* pTimestamp)
 
 T_PDU_ERROR __stdcall PDUIoCtl(UNUM32 hMod, UNUM32 hCLL, UNUM32 IoCtlCommandId, PDU_DATA_ITEM* pInputData, PDU_DATA_ITEM** pOutputData)
 {
-	LOGGER.logWarn("STUB", "PDUIoCtl is unimplimented");
+	LOGGER.logWarn("PDUIoCtl", "hMod %u, hCLL %u, IoCtlCommandId %u", hMod, hCLL, IoCtlCommandId);
 	return PDU_STATUS_NOERROR;
 }
 
@@ -154,30 +179,54 @@ T_PDU_ERROR __stdcall PDURegisterEventCallback(UNUM32 hMod, UNUM32 hCLL, CALLBAC
 
 T_PDU_ERROR __stdcall PDUGetObjectId(T_PDU_OBJT pduObjectType, CHAR8* pShortname, UNUM32* pPduObjectId)
 {
-	LOGGER.logWarn("STUB", "PDUGetObjectId is unimplimented");
+	static UNUM32 ctr = 0;
+	*pPduObjectId = ctr++;
+
+	LOGGER.logWarn("PDUGetObjectId", "pduObjectType %d, pShortname %s", (int)pduObjectType, pShortname);
 	return PDU_STATUS_NOERROR;
 }
 
-// -- Testing --
-PDU_MODULE_DATA d = {
-	1,
-	1,
-	(CHAR8*)"Macchina M2 UTD",
-	(CHAR8*)"github.com/rnd-ash",
-	PDU_MODST_AVAIL
-};
+//storage for PDUGetModuleIds
+static std::vector<std::string> m_pduModuleNames;
+static std::vector<PDU_MODULE_DATA> m_pduModules;
+static CHAR8 m_additionalInfo[32] = "ConnectionType = 'unknown'";
 
-PDU_MODULE_ITEM x = {
+static PDU_MODULE_ITEM m_moduleItem = {
 	PDU_IT_MODULE_ID,
-	1,
-	&d
+	0,
+	nullptr,
 };
 
 T_PDU_ERROR __stdcall PDUGetModuleIds(PDU_MODULE_ITEM** pModuleIdList)
 {
-	//pModuleIdList = new PDU_MODULE_ITEM*[1];
-	*pModuleIdList = &x;
-	LOGGER.logWarn("STUB", "PDUGetModuleIds is unimplimented");
+	m_registryList.clear();
+	m_pduModules.clear();
+	m_pduModuleNames.clear();
+	m_moduleItem.NumEntries = 0;
+
+	std::set<cPassThruInfo> reg;
+	shim_enumPassThruInterfaces(reg);
+	std::copy(reg.begin(), reg.end(), std::back_inserter(m_registryList));
+
+	UNUM32 idx = 0;
+	for (auto iface : m_registryList)
+	{
+		std::ostringstream ss;
+		ss << "VendorName='" << iface.Vendor << "' ModuleName='" << iface.Name.c_str() << "' J2534 Standard Version='4.04'";
+		std::string str = ss.str();
+
+		m_pduModuleNames.push_back(str);
+		LOGGER.logInfo("PDUGetModuleIds", "Interface: %s", str.c_str());
+
+		PDU_MODULE_DATA d = { 1, idx, (CHAR8*)m_pduModuleNames.back().c_str(), m_additionalInfo, PDU_MODST_AVAIL};
+		m_pduModules.push_back(d);
+		++idx;
+	}
+
+	m_moduleItem.pModuleData = &m_pduModules[0];
+	m_moduleItem.NumEntries = idx;
+	*pModuleIdList = &m_moduleItem;
+
 	return PDU_STATUS_NOERROR;
 }
 

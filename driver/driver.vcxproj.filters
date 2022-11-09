@@ -30,6 +30,12 @@
     <ClInclude Include="macchina_dpdu.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="j2534\shim_loader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="j2534\j2534_v0404.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -42,6 +48,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Logger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="j2534\shim_loader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
