@@ -26,7 +26,7 @@
 #include <Windows.h>
 #include <mutex>
 
-#define LOG_FILE "C:\\Program Files (x86)\\macchina\\dpdu\\activity.log"
+#define LOG_FILE "C:\\Users\\Public\\dpdu_activity.log"
 
 class Logger
 {
