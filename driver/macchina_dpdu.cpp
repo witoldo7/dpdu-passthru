@@ -484,7 +484,7 @@ T_PDU_ERROR __stdcall PDUGetModuleIds(PDU_MODULE_ITEM** pModuleIdList)
 	for (auto iface : m_registryList)
 	{
 		std::ostringstream ss;
-		ss << "VendorName='" << iface.Vendor << "' ModuleName='" << iface.Name.c_str() << "' J2534 Standard Version='4.04'";
+		ss << iface.Name.c_str();
 		std::string str = ss.str();
 
 		m_pduModuleNames.push_back(str);
