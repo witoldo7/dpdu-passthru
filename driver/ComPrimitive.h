@@ -14,10 +14,18 @@ public:
 	long StartComm(unsigned long channelID, PDU_EVENT_ITEM* & pEvt);
 	long SendRecv(unsigned long channelID, PDU_EVENT_ITEM*& pEvt);
 
+	T_PDU_STATUS GetStatus();
+
 	void Execute(PDU_EVENT_ITEM*& pEvt);
 	void Finish(PDU_EVENT_ITEM*& pEvt);
+	void Cancel(PDU_EVENT_ITEM*& pEvt);
+	void Destroy();
 
 private:
+	bool TesterPresentSimulation(PDU_EVENT_ITEM*& pEvt);
+	void GenerateStatusEvent(PDU_EVENT_ITEM*& pEvt);
+
+	T_PDU_STATUS m_state;
 
 	UNUM32 m_hCoP;
 	UNUM32 m_CoPType;

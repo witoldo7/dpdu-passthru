@@ -143,20 +143,34 @@ T_PDU_ERROR __stdcall PDUGetVersion(UNUM32 hMod, PDU_VERSION_DATA* pVersionData)
 T_PDU_ERROR __stdcall PDUGetStatus(UNUM32 hMod, UNUM32 hCLL, UNUM32 hCoP, T_PDU_STATUS* pStatusCode, UNUM32* pTimestamp, UNUM32* pExtraInfo)
 {
 	T_PDU_ERROR ret = PDU_STATUS_NOERROR;
+	T_PDU_STATUS status = PDU_MODST_NOT_AVAIL;
 
-	LOGGER.logInfo("PDUGetStatus", " hMod: %u, hCll: %u, hCoP: %u", hMod, hCLL, hCoP);
-
-	//TODO get status from actual CoP
-	if (hCoP != PDU_ID_UNDEF)
+	if (hCLL == PDU_HANDLE_UNDEF && hCoP == PDU_HANDLE_UNDEF)
 	{
-		ret = PDU_ERR_INVALID_HANDLE;
+		//TODO get actual module status
+		status = PDU_MODST_READY;
+	}
+	else if (hCoP == PDU_HANDLE_UNDEF)
+	{
+		//TODO get actual CLL status
+		status = PDU_CLLST_ONLINE;
+	}
+	else
+	{
+		auto it = m_commChannels.find(hCLL);
+		if (it != m_commChannels.end())
+		{
+			ret = it->second->GetStatus(hCoP, status);
+		}
 	}
 
-	*pStatusCode = PDU_MODST_READY;
+	*pStatusCode = status;
 
 	if (pExtraInfo != nullptr) {
 		*pExtraInfo = 0;
 	}
+
+	LOGGER.logInfo("PDUGetStatus", " hMod: %u, hCll: %u, hCoP: %u, StatusCode 0x%x", hMod, hCLL, hCoP, *pStatusCode);
 
 	return ret;
 }
@@ -311,8 +325,8 @@ T_PDU_ERROR __stdcall PDUStartComPrimitive(UNUM32 hMod, UNUM32 hCLL, UNUM32 CoPT
 		hMod, hCLL, CoPType, CoPDataSize, pCoPData, pCopCtrlData);
 	if (pCopCtrlData != nullptr)
 	{
-		LOGGER.logInfo("PDUStartComPrimitive", "NumSendCycles %d, NumReceiveCycles %d, NumPossibleExpectedResponses %u",
-			pCopCtrlData->NumSendCycles, pCopCtrlData->NumReceiveCycles, pCopCtrlData->NumPossibleExpectedResponses);
+		LOGGER.logInfo("PDUStartComPrimitive", "Time %u, NumSendCycles %d, NumReceiveCycles %d, TempParamUpdate %u, NumPossibleExpectedResponses %u",
+			pCopCtrlData->Time, pCopCtrlData->NumSendCycles, pCopCtrlData->NumReceiveCycles, pCopCtrlData->TempParamUpdate, pCopCtrlData->NumPossibleExpectedResponses);
 
 		if (pCopCtrlData->NumPossibleExpectedResponses > 0)
 		{
@@ -360,8 +374,17 @@ T_PDU_ERROR __stdcall PDUStartComPrimitive(UNUM32 hMod, UNUM32 hCLL, UNUM32 CoPT
 
 T_PDU_ERROR __stdcall PDUCancelComPrimitive(UNUM32 hMod, UNUM32 hCLL, UNUM32 hCoP)
 {
-	LOGGER.logWarn("STUB", "PDUCancelComPrimitive is unimplimented");
-	return PDU_STATUS_NOERROR;
+	T_PDU_ERROR ret = PDU_STATUS_NOERROR;
+
+	LOGGER.logInfo("PDUCancelComPrimitive", "hMod %u, hCLL %u, hCoP %u", hMod, hCLL, hCoP);
+
+	auto it = m_commChannels.find(hCLL);
+	if (it != m_commChannels.end())
+	{
+		ret = it->second->Cancel(hCoP);
+	}
+
+	return ret;
 }
 
 T_PDU_ERROR __stdcall PDUGetEventItem(UNUM32 hMod, UNUM32 hCLL, PDU_EVENT_ITEM** pEventItem)

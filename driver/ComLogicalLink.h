@@ -15,6 +15,10 @@ public:
 
 	long Connect();
 	long Disconnect();
+
+	T_PDU_ERROR GetStatus(UNUM32 hCoP, T_PDU_STATUS& status);
+	T_PDU_ERROR Cancel(UNUM32 hCoP);
+
 	UNUM32 StartComPrimitive(UNUM32 CoPType, UNUM32 CoPDataSize, UNUM8* pCoPData, PDU_COP_CTRL_DATA* pCopCtrlData, void* pCoPTag);
 	long StartMsgFilter(unsigned long filterType);
 
@@ -41,7 +45,7 @@ private:
 	std::queue<PDU_EVENT_ITEM*> m_eventQueue;
 
 	std::mutex m_copLock;
-	std::queue<std::shared_ptr<ComPrimitive>> m_copQueue;
+	std::vector<std::shared_ptr<ComPrimitive>> m_copQueue;
 
 	UNUM32 m_hMod;
 	UNUM32 m_hCLL;

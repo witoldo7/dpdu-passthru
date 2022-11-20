@@ -56,6 +56,16 @@ long ComLogicalLink::Disconnect()
 		m_running = false;
 		m_runLoop.join();
 
+		{
+			const std::lock_guard<std::mutex> lock(m_copLock);
+			for (auto it = m_copQueue.begin(); it != m_copQueue.end(); ++it)
+			{
+				PDU_EVENT_ITEM* pEvt = nullptr;
+				(*it)->Cancel(pEvt);
+				QueueEvent(pEvt);
+			}
+		}
+
 		PDU_EVENT_ITEM* pEvt = new PDU_EVENT_ITEM;
 		pEvt->hCop = PDU_HANDLE_UNDEF;
 		pEvt->ItemType = PDU_IT_STATUS;
@@ -69,13 +79,68 @@ long ComLogicalLink::Disconnect()
 	return ret;
 }
 
+T_PDU_ERROR ComLogicalLink::GetStatus(UNUM32 hCoP, T_PDU_STATUS& status)
+{
+	T_PDU_ERROR ret = PDU_STATUS_NOERROR;
+
+	{
+		const std::lock_guard<std::mutex> lock(m_copLock);
+
+		auto it = m_copQueue.end();
+		for (it = m_copQueue.begin(); it != m_copQueue.end(); ++it)
+		{
+			if ((*it)->getHandle() == hCoP)
+			{
+				status = (*it)->GetStatus();
+				break;
+			}
+		}
+
+		if (it == m_copQueue.end() || (*it)->getHandle() == 0)
+		{
+			ret = PDU_ERR_INVALID_HANDLE;
+		}
+	}
+
+	return ret;
+}
+
+T_PDU_ERROR ComLogicalLink::Cancel(UNUM32 hCoP)
+{
+	T_PDU_ERROR ret = PDU_STATUS_NOERROR;
+
+	PDU_EVENT_ITEM* pEvt = nullptr;
+	{
+		const std::lock_guard<std::mutex> lock(m_copLock);
+
+		auto it = m_copQueue.end();
+		for (it = m_copQueue.begin(); it != m_copQueue.end(); ++it)
+		{
+			if ((*it)->getHandle() == hCoP)
+			{
+				(*it)->Cancel(pEvt);
+				break;
+			}
+		}
+
+		if (it == m_copQueue.end() || (*it)->getHandle() == 0)
+		{
+			ret = PDU_ERR_INVALID_HANDLE;
+		}
+	}
+
+	SignalEvent(pEvt);
+
+	return ret;
+}
+
 UNUM32 ComLogicalLink::StartComPrimitive(UNUM32 CoPType, UNUM32 CoPDataSize, UNUM8* pCoPData, PDU_COP_CTRL_DATA* pCopCtrlData, void* pCoPTag)
 {
 	auto cop = std::shared_ptr<ComPrimitive>(new ComPrimitive(CoPType, CoPDataSize, pCoPData, pCopCtrlData, pCoPTag));
 
 	{
 		const std::lock_guard<std::mutex> lock(m_copLock);
-		m_copQueue.push(cop);
+		m_copQueue.push_back(cop);
 	}
 
 	return cop->getHandle();
@@ -110,11 +175,31 @@ bool ComLogicalLink::GetEvent(PDU_EVENT_ITEM* & pEvt)
 		m_eventQueue.pop();
 	}
 
+	PDU_STATUS_DATA state = *(PDU_STATUS_DATA*)(pEvt->pData);
+	if (state == PDU_COPST_FINISHED || state == PDU_COPST_CANCELLED)
+	{
+		const std::lock_guard<std::mutex> lock(m_copLock);
+
+		for (auto it = m_copQueue.begin(); it != m_copQueue.end(); ++it)
+		{
+			if ((*it)->getHandle() == pEvt->hCop)
+			{
+				(*it)->Destroy();
+				break;
+			}
+		}
+	}
+
 	return true;
 }
 
 void ComLogicalLink::SignalEvent(PDU_EVENT_ITEM* pEvt)
 {
+	if (pEvt == nullptr)
+	{
+		return;
+	}
+
 	QueueEvent(pEvt);
 	SignalEvents();
 }
@@ -147,35 +232,47 @@ void ComLogicalLink::QueueEvent(PDU_EVENT_ITEM* pEvt)
 
 void ComLogicalLink::run()
 {
-	LOGGER.logInfo("ComLogicalLink", "ChannelId %u RunLoop started...", m_channelID);
+	LOGGER.logInfo("ComLogicalLink/run", "ChannelId %u RunLoop started...", m_channelID);
 
 	while (m_running)
 	{
-		std::shared_ptr<ComPrimitive> cop;
+		auto it = m_copQueue.end();
+		auto it_end = m_copQueue.end();
 		{
 			const std::lock_guard<std::mutex> lock(m_copLock);
-			if (!m_copQueue.empty())
+
+			for (it = m_copQueue.begin(); it != m_copQueue.end();)
 			{
-				cop = m_copQueue.front();
-				m_copQueue.pop();
+				if ((*it)->getHandle() == 0)
+				{
+					LOGGER.logInfo("ComLogicalLink/run", "Erased cop");
+					it = m_copQueue.erase(it);
+				}
+				else
+				{
+					++it;
+				}
 			}
+
+			it = m_copQueue.begin();
+			it_end = m_copQueue.end();
 		}
 
-		if (cop == nullptr)
+		for (it; it != it_end; ++it)
 		{
-			//throttle if no cops to process
-			std::this_thread::sleep_for(std::chrono::milliseconds(10));
-			continue;
+			LOGGER.logInfo("ComLogicalLink/run", "Processing cop %u", (*it)->getHandle());
+			ProcessCop(*it);
 		}
+		
 
-		ProcessCop(cop);
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}
 }
 
 void ComLogicalLink::ProcessCop(std::shared_ptr<ComPrimitive> cop)
 {
 	long ret = STATUS_NOERROR;
-	PDU_EVENT_ITEM* pEvt;
+	PDU_EVENT_ITEM* pEvt = nullptr;
 
 	cop->Execute(pEvt);
 	SignalEvent(pEvt);
@@ -191,6 +288,7 @@ void ComLogicalLink::ProcessCop(std::shared_ptr<ComPrimitive> cop)
 		break;
 	}
 
+	pEvt = nullptr;
 	cop->Finish(pEvt);
 	SignalEvent(pEvt);
 
@@ -206,7 +304,7 @@ long ComLogicalLink::StartComm(std::shared_ptr<ComPrimitive> cop)
 	long ret = STATUS_NOERROR;
 	if (m_protocolID == ISO14230)
 	{
-		PDU_EVENT_ITEM* pEvt;
+		PDU_EVENT_ITEM* pEvt = nullptr;
 
 		ret = cop->StartComm(m_channelID, pEvt);
 		if (ret == STATUS_NOERROR)
@@ -219,7 +317,7 @@ long ComLogicalLink::StartComm(std::shared_ptr<ComPrimitive> cop)
 			pEvt->pCoPTag = nullptr;
 			pEvt->pData = new PDU_STATUS_DATA;
 			*(PDU_STATUS_DATA*)(pEvt->pData) = PDU_CLLST_COMM_STARTED;
-			QueueEvent(pEvt);
+			SignalEvent(pEvt);
 		}
 	}
 
@@ -229,13 +327,14 @@ long ComLogicalLink::StartComm(std::shared_ptr<ComPrimitive> cop)
 long ComLogicalLink::SendRecv(std::shared_ptr<ComPrimitive> cop)
 {
 	long ret = STATUS_NOERROR;
-	PDU_EVENT_ITEM* pEvt;
+	PDU_EVENT_ITEM* pEvt = nullptr;
 
 	ret = cop->SendRecv(m_channelID, pEvt);
 	if (ret == STATUS_NOERROR)
 	{
-		QueueEvent(pEvt);
+		SignalEvent(pEvt);
 	}
+
 
 	return ret;
 }
