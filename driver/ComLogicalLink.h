@@ -16,6 +16,7 @@ public:
 	long Connect();
 	long Disconnect();
 
+	T_PDU_ERROR GetStatus(T_PDU_STATUS& status);
 	T_PDU_ERROR GetStatus(UNUM32 hCoP, T_PDU_STATUS& status);
 	T_PDU_ERROR Cancel(UNUM32 hCoP);
 
@@ -34,6 +35,7 @@ private:
 
 	void ProcessCop(std::shared_ptr<ComPrimitive> cop);
 	long StartComm(std::shared_ptr<ComPrimitive> cop);
+	long StopComm(std::shared_ptr<ComPrimitive> cop);
 	long SendRecv(std::shared_ptr<ComPrimitive> cop);
 
 	CALLBACKFNC m_eventCallbackFnc;
@@ -49,6 +51,7 @@ private:
 
 	UNUM32 m_hMod;
 	UNUM32 m_hCLL;
+	T_PDU_STATUS m_status;
 
 	//J2534 specific
 	unsigned long m_deviceID;

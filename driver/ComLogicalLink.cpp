@@ -10,7 +10,7 @@
 #include <sstream>
 
 ComLogicalLink::ComLogicalLink(UNUM32 hMod, UNUM32 hCLL, unsigned long deviceID, unsigned long protocolID) :
-	m_eventCallbackFnc(nullptr), m_hMod(hMod), m_hCLL(hCLL), m_deviceID(deviceID), m_protocolID(protocolID), m_channelID(0), m_running(false)
+	m_eventCallbackFnc(nullptr), m_hMod(hMod), m_hCLL(hCLL), m_status(PDU_CLLST_OFFLINE), m_deviceID(deviceID), m_protocolID(protocolID), m_channelID(0), m_running(false)
 {
 }
 
@@ -32,12 +32,14 @@ long ComLogicalLink::Connect()
 		m_running = true;
 		m_runLoop = std::thread(&ComLogicalLink::run, this);
 
+		m_status = PDU_CLLST_ONLINE;
+
 		PDU_EVENT_ITEM* pEvt = new PDU_EVENT_ITEM;
 		pEvt->hCop = PDU_HANDLE_UNDEF;
 		pEvt->ItemType = PDU_IT_STATUS;
 		pEvt->pCoPTag = nullptr;
 		pEvt->pData = new PDU_STATUS_DATA;
-		*(PDU_STATUS_DATA*)(pEvt->pData) = PDU_CLLST_ONLINE;
+		*(PDU_STATUS_DATA*)(pEvt->pData) = m_status;
 
 		SignalEvent(pEvt);
 	}
@@ -66,15 +68,26 @@ long ComLogicalLink::Disconnect()
 			}
 		}
 
+		m_status = PDU_CLLST_OFFLINE;
+
 		PDU_EVENT_ITEM* pEvt = new PDU_EVENT_ITEM;
 		pEvt->hCop = PDU_HANDLE_UNDEF;
 		pEvt->ItemType = PDU_IT_STATUS;
 		pEvt->pCoPTag = nullptr;
 		pEvt->pData = new PDU_STATUS_DATA;
-		*(PDU_STATUS_DATA*)(pEvt->pData) = PDU_CLLST_OFFLINE;
+		*(PDU_STATUS_DATA*)(pEvt->pData) = m_status;
 
 		SignalEvent(pEvt);
 	}
+
+	return ret;
+}
+
+T_PDU_ERROR ComLogicalLink::GetStatus(T_PDU_STATUS& status)
+{
+	T_PDU_ERROR ret = PDU_STATUS_NOERROR;
+
+	status = m_status;
 
 	return ret;
 }
@@ -98,6 +111,7 @@ T_PDU_ERROR ComLogicalLink::GetStatus(UNUM32 hCoP, T_PDU_STATUS& status)
 
 		if (it == m_copQueue.end() || (*it)->getHandle() == 0)
 		{
+			status = PDU_COPST_FINISHED;
 			ret = PDU_ERR_INVALID_HANDLE;
 		}
 	}
@@ -282,7 +296,9 @@ void ComLogicalLink::ProcessCop(std::shared_ptr<ComPrimitive> cop)
 	case PDU_COPT_STARTCOMM:
 		ret = StartComm(cop);
 		break;
-
+	case PDU_COPT_STOPCOMM:
+		ret = StopComm(cop);
+		break;
 	case PDU_COPT_SENDRECV:
 		ret = SendRecv(cop);
 		break;
@@ -311,14 +327,39 @@ long ComLogicalLink::StartComm(std::shared_ptr<ComPrimitive> cop)
 		{
 			QueueEvent(pEvt);
 
+			m_status = PDU_CLLST_COMM_STARTED;
+
 			pEvt = new PDU_EVENT_ITEM;
 			pEvt->hCop = PDU_HANDLE_UNDEF;
 			pEvt->ItemType = PDU_IT_STATUS;
 			pEvt->pCoPTag = nullptr;
 			pEvt->pData = new PDU_STATUS_DATA;
-			*(PDU_STATUS_DATA*)(pEvt->pData) = PDU_CLLST_COMM_STARTED;
+			*(PDU_STATUS_DATA*)(pEvt->pData) = m_status;
+
 			SignalEvent(pEvt);
 		}
+	}
+
+	return ret;
+}
+
+long ComLogicalLink::StopComm(std::shared_ptr<ComPrimitive> cop)
+{
+	long ret = STATUS_NOERROR;
+	if (m_protocolID == ISO14230)
+	{
+		m_status = PDU_CLLST_ONLINE;
+
+		PDU_EVENT_ITEM* pEvt = nullptr;
+
+		pEvt = new PDU_EVENT_ITEM;
+		pEvt->hCop = PDU_HANDLE_UNDEF;
+		pEvt->ItemType = PDU_IT_STATUS;
+		pEvt->pCoPTag = nullptr;
+		pEvt->pData = new PDU_STATUS_DATA;
+		*(PDU_STATUS_DATA*)(pEvt->pData) = m_status;
+
+		SignalEvent(pEvt);
 	}
 
 	return ret;

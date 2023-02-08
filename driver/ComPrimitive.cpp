@@ -164,6 +164,8 @@ long ComPrimitive::SendRecv(unsigned long channelID, PDU_EVENT_ITEM*& pEvt)
 			{
 				ss << std::hex << (int)rxMsg[1].Data[i] << " ";
 			}
+			ss << "RXStatus: " << std::hex << (int)rxMsg[1].RxStatus;
+
 			LOGGER.logInfo("ComPrimitive/SendRecv", ss.str().c_str());
 
 			if (rxMsg[1].DataSize >= 6 && rxMsg[1].Data[3] == 0x7F && rxMsg[1].Data[5] == 0x78)

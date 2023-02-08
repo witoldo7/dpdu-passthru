@@ -145,6 +145,8 @@ T_PDU_ERROR __stdcall PDUGetStatus(UNUM32 hMod, UNUM32 hCLL, UNUM32 hCoP, T_PDU_
 	T_PDU_ERROR ret = PDU_STATUS_NOERROR;
 	T_PDU_STATUS status = PDU_MODST_NOT_AVAIL;
 
+	auto it = m_commChannels.find(hCLL);
+
 	if (hCLL == PDU_HANDLE_UNDEF && hCoP == PDU_HANDLE_UNDEF)
 	{
 		//TODO get actual module status
@@ -152,12 +154,13 @@ T_PDU_ERROR __stdcall PDUGetStatus(UNUM32 hMod, UNUM32 hCLL, UNUM32 hCoP, T_PDU_
 	}
 	else if (hCoP == PDU_HANDLE_UNDEF)
 	{
-		//TODO get actual CLL status
-		status = PDU_CLLST_ONLINE;
+		if (it != m_commChannels.end())
+		{
+			ret = it->second->GetStatus(status);
+		}
 	}
 	else
 	{
-		auto it = m_commChannels.find(hCLL);
 		if (it != m_commChannels.end())
 		{
 			ret = it->second->GetStatus(hCoP, status);
@@ -170,7 +173,7 @@ T_PDU_ERROR __stdcall PDUGetStatus(UNUM32 hMod, UNUM32 hCLL, UNUM32 hCoP, T_PDU_
 		*pExtraInfo = 0;
 	}
 
-	LOGGER.logInfo("PDUGetStatus", " hMod: %u, hCll: %u, hCoP: %u, StatusCode 0x%x", hMod, hCLL, hCoP, *pStatusCode);
+	LOGGER.logInfo("PDUGetStatus", " hMod: %u, hCll: %u, hCoP: %u, StatusCode 0x%x, ret 0x%x", hMod, hCLL, hCoP, *pStatusCode, ret);
 
 	return ret;
 }
@@ -325,16 +328,21 @@ T_PDU_ERROR __stdcall PDUStartComPrimitive(UNUM32 hMod, UNUM32 hCLL, UNUM32 CoPT
 		hMod, hCLL, CoPType, CoPDataSize, pCoPData, pCopCtrlData);
 	if (pCopCtrlData != nullptr)
 	{
-		LOGGER.logInfo("PDUStartComPrimitive", "Time %u, NumSendCycles %d, NumReceiveCycles %d, TempParamUpdate %u, NumPossibleExpectedResponses %u",
-			pCopCtrlData->Time, pCopCtrlData->NumSendCycles, pCopCtrlData->NumReceiveCycles, pCopCtrlData->TempParamUpdate, pCopCtrlData->NumPossibleExpectedResponses);
+		LOGGER.logInfo("PDUStartComPrimitive", "    Time %u, NumSendCycles %d, NumReceiveCycles %d, TempParamUpdate %u, NumPossibleExpectedResponses %u, TxFlag.NumFlagBytes %u",
+			pCopCtrlData->Time, pCopCtrlData->NumSendCycles, pCopCtrlData->NumReceiveCycles, pCopCtrlData->TempParamUpdate, pCopCtrlData->NumPossibleExpectedResponses, pCopCtrlData->TxFlag.NumFlagBytes);
 
 		if (pCopCtrlData->NumPossibleExpectedResponses > 0)
 		{
 			PDU_EXP_RESP_DATA respData = pCopCtrlData->pExpectedResponseArray[0];
-			LOGGER.logInfo("PDUStartComPrimitive", "ResponseType %u, AcceptanceId %u, NumMaskPatternBytes %u, NumUniqueRespIds %u",
+			LOGGER.logInfo("PDUStartComPrimitive", "    ResponseType %u, AcceptanceId %u, NumMaskPatternBytes %u, NumUniqueRespIds %u",
 				respData.ResponseType, respData.AcceptanceId, respData.NumMaskPatternBytes, respData.NumUniqueRespIds);
 		}
 
+		if (pCopCtrlData->TxFlag.NumFlagBytes > 0)
+		{
+			LOGGER.logInfo("PDUStartComPrimitive", "    pFlagData[0] 0x%x, pFlagData[1] 0x%x, pFlagData[2] 0x%x, pFlagData[3] 0x%x",
+				pCopCtrlData->TxFlag.pFlagData[0], pCopCtrlData->TxFlag.pFlagData[1], pCopCtrlData->TxFlag.pFlagData[2], pCopCtrlData->TxFlag.pFlagData[3]);
+		}
 	}
 
 	auto it = m_commChannels.find(hCLL);
@@ -352,11 +360,20 @@ T_PDU_ERROR __stdcall PDUStartComPrimitive(UNUM32 hMod, UNUM32 hCLL, UNUM32 CoPT
 			pEvt->ItemType = PDU_IT_STATUS;
 			pEvt->pCoPTag = pCoPTag;
 			pEvt->pData = new PDU_STATUS_DATA;
-			*(PDU_STATUS_DATA*)(pEvt->pData) = PDU_COPST_FINISHED;
-
+			*(PDU_STATUS_DATA*)(pEvt->pData) = PDU_COPST_EXECUTING;
 			it->second->SignalEvent(pEvt);
+
+			pEvt = new PDU_EVENT_ITEM;
+			pEvt->hCop = *phCoP;
+			pEvt->ItemType = PDU_IT_STATUS;
+			pEvt->pCoPTag = pCoPTag;
+			pEvt->pData = new PDU_STATUS_DATA;
+			*(PDU_STATUS_DATA*)(pEvt->pData) = PDU_COPST_FINISHED;
+			it->second->SignalEvent(pEvt);
+
 			break;
 		case PDU_COPT_STARTCOMM:
+		case PDU_COPT_STOPCOMM:
 		case PDU_COPT_SENDRECV:
 			*phCoP = it->second->StartComPrimitive(CoPType, CoPDataSize, pCoPData, pCopCtrlData, pCoPTag);
 			break;
