@@ -95,7 +95,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <ModuleDefinitionFile>macchina_dpdu.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>dpdu.def</ModuleDefinitionFile>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y $(TargetDir)$(ProjectName).dll "C:\Program Files (x86)\macchina\dpdu\*"</Command>
@@ -118,7 +118,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <ModuleDefinitionFile>macchina_dpdu.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>dpdu.def</ModuleDefinitionFile>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y $(TargetDir)$(ProjectName).dll "C:\Program Files (x86)\macchina\dpdu\*"</Command>
@@ -165,7 +165,7 @@
     <ClInclude Include="j2534\j2534_v0404.h" />
     <ClInclude Include="j2534\shim_loader.h" />
     <ClInclude Include="Logger.h" />
-    <ClInclude Include="macchina_dpdu.h" />
+    <ClInclude Include="dpdu.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="pdu_api.h" />
   </ItemGroup>
@@ -178,7 +178,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Logger.cpp" />
-    <ClCompile Include="macchina_dpdu.cpp" />
+    <ClCompile Include="dpdu.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -187,7 +187,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="macchina_dpdu.def" />
+    <None Include="dpdu.def" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

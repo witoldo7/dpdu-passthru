@@ -27,7 +27,7 @@
     <ClInclude Include="Logger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="macchina_dpdu.h">
+    <ClInclude Include="dpdu.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="j2534\shim_loader.h">
@@ -50,7 +50,7 @@
     <ClCompile Include="pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="macchina_dpdu.cpp">
+    <ClCompile Include="dpdu.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Logger.cpp">
@@ -67,7 +67,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="macchina_dpdu.def">
+    <None Include="dpdu.def">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>
