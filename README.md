@@ -11,3 +11,7 @@ D-PDU API driver for J2534 compatible devices. Currently supports only GM Tech2W
 * Abstraction for J2534 devices (+ support for other devices)
 * Find out why Saab 9-5 post-2006 fails communication with DICE through the K-Line 
 * ISO15765 / CAN support
+
+# Instructions
+1. Build the project with Visual Studio 2022, using the Release build configuration
+2. Install the driver by running the .bat installer as administrator: https://github.com/JohnJocke/dpdu-passthru/blob/master/installer/install.bat
