@@ -19,8 +19,17 @@ long ComLogicalLink::Connect()
 	long ret = STATUS_NOERROR;
 	switch (m_protocolID)
 	{
-		case ISO14230:
-			ret = _PassThruConnect(m_deviceID, m_protocolID, 0, 10400, &m_channelID);
+		case ISO14230_PS:
+			ret = _PassThruConnect(m_deviceID, m_protocolID, ISO9141_K_LINE_ONLY, 10400, &m_channelID);
+			if (ret == STATUS_NOERROR) {
+				SCONFIG_LIST configList;
+				SCONFIG configs[10];
+				configs[0].Parameter = J1962_PINS;
+				configs[0].Value = 0x0700;
+				configList.NumOfParams = 1;
+				configList.ConfigPtr = configs;
+				ret = _PassThruIoctl(m_channelID, SET_CONFIG, &configList, NULL);
+			}
 			break;
 		default:
 			ret = ERR_INVALID_PROTOCOL_ID;
@@ -165,8 +174,19 @@ long ComLogicalLink::StartMsgFilter(unsigned long filterType)
 	long ret = STATUS_NOERROR;
 
 	unsigned long filterId = 0;
-	PASSTHRU_MSG msg = { m_channelID, 0, 0, 0, 4, 4, {0, 0, 0, 0} };
-	ret = _PassThruStartMsgFilter(m_channelID, filterType, &msg, &msg, &msg, &filterId);
+	PASSTHRU_MSG msg = { ISO14230_PS, 0, 0, 0, 4, 4, {0, 0, 0, 0} };
+	PASSTHRU_MSG msg1 = { ISO14230_PS, 0, 0, 0, 4, 4, {0, 0, 0, 0} };
+	ret = _PassThruStartMsgFilter(m_channelID, filterType, &msg, &msg1, NULL, &filterId);
+
+	return ret;
+}
+
+long ComLogicalLink::IoctlSetConfig(SCONFIG_LIST list)
+{
+	LOGGER.logInfo("ComLogicalLink/IoctlSetConfig", "ID: %x", list.ConfigPtr->Parameter );
+	long ret = STATUS_NOERROR;
+
+	ret = _PassThruIoctl(m_channelID, SET_CONFIG, &list, NULL);
 
 	return ret;
 }
@@ -318,7 +338,7 @@ void ComLogicalLink::ProcessCop(std::shared_ptr<ComPrimitive> cop)
 long ComLogicalLink::StartComm(std::shared_ptr<ComPrimitive> cop)
 {
 	long ret = STATUS_NOERROR;
-	if (m_protocolID == ISO14230)
+	if (m_protocolID == ISO14230_PS)
 	{
 		PDU_EVENT_ITEM* pEvt = nullptr;
 
@@ -345,12 +365,11 @@ long ComLogicalLink::StartComm(std::shared_ptr<ComPrimitive> cop)
 
 long ComLogicalLink::StopComm(std::shared_ptr<ComPrimitive> cop)
 {
-	long ret = STATUS_NOERROR;
-	if (m_protocolID == ISO14230)
+	PDU_EVENT_ITEM* pEvt = nullptr;
+	long ret = cop->StopComm(m_channelID, pEvt);
+	if (m_protocolID == ISO14230_PS)
 	{
 		m_status = PDU_CLLST_ONLINE;
-
-		PDU_EVENT_ITEM* pEvt = nullptr;
 
 		pEvt = new PDU_EVENT_ITEM;
 		pEvt->hCop = PDU_HANDLE_UNDEF;

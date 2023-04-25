@@ -12,6 +12,7 @@ public:
 	UNUM32 getType();
 
 	long StartComm(unsigned long channelID, PDU_EVENT_ITEM* & pEvt);
+	long StopComm(unsigned long channelID, PDU_EVENT_ITEM*& pEvt);
 	long SendRecv(unsigned long channelID, PDU_EVENT_ITEM*& pEvt);
 
 	T_PDU_STATUS GetStatus();

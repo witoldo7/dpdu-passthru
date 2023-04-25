@@ -90,6 +90,7 @@ T_PDU_ERROR __stdcall PDUIoCtl(UNUM32 hMod, UNUM32 hCLL, UNUM32 IoCtlCommandId, 
 	auto it = m_objectIdMap.find(IoCtlCommandId);
 	if (it != m_objectIdMap.end())
 	{
+
 		if (it->second == std::string("PDU_IOCTL_READ_VBATT"))
 		{
 			unsigned long volt;
@@ -136,7 +137,21 @@ T_PDU_ERROR __stdcall PDUIoCtl(UNUM32 hMod, UNUM32 hCLL, UNUM32 IoCtlCommandId, 
 
 T_PDU_ERROR __stdcall PDUGetVersion(UNUM32 hMod, PDU_VERSION_DATA* pVersionData)
 {
-	LOGGER.logWarn("STUB", "PDUGetVersion is unimplimented");
+	LOGGER.logWarn("STUB", "PDUGetVersion is unimplimented, fake data");
+	pVersionData->MVCI_Part1StandardVersion = 404;
+	pVersionData->MVCI_Part2StandardVersion = 404;
+	pVersionData->HwSerialNumber = 12345;
+	memcpy(pVersionData->HwName, "Best HW0", 4);
+	pVersionData->HwVersion = 1234;
+	pVersionData->HwDate =  21321;
+	pVersionData->HwInterface = 32132130;
+	memcpy(pVersionData->FwName, "Good FW0", 4);
+	pVersionData->FwVersion =432432;
+	pVersionData->FwDate = 432432;
+	memcpy(pVersionData->VendorName, "Good0", 4);
+	memcpy(pVersionData->PDUApiSwName, "4040", 4);
+	pVersionData->PDUApiSwVersion = 43432;
+	pVersionData->PDUApiSwDate = 32432;
 	return PDU_STATUS_NOERROR;
 }
 
@@ -200,7 +215,7 @@ T_PDU_ERROR __stdcall PDUCreateComLogicalLink(UNUM32 hMod, PDU_RSC_DATA* pRscDat
 	{
 		if (it->second == std::string("ISO_14230_3_on_ISO_14230_2"))
 		{
-			protocolId = ISO14230;
+			protocolId = ISO14230_PS;
 		}
 
 		LOGGER.logInfo("PDUCreateComLogicalLink", "Detected J2534 ProtocolID %u, DPDU: %s", protocolId, it->second.c_str());
@@ -313,8 +328,79 @@ T_PDU_ERROR __stdcall PDUGetComParam(UNUM32 hMod, UNUM32 hCLL, UNUM32 ParamId, P
 
 T_PDU_ERROR __stdcall PDUSetComParam(UNUM32 hMod, UNUM32 hCLL, PDU_PARAM_ITEM* pParamItem)
 {
-	LOGGER.logWarn("PDUSetComParam", "hMod %u, hCLL %u, ComParamId %u, ComParamDataType %u, ComParamData %u",
+	auto itCLL = m_commChannels.find(hCLL);
+	auto it = m_objectIdMap.find(pParamItem->ComParamId);
+	if (it != m_objectIdMap.end() && itCLL != m_commChannels.end())
+	{
+		SCONFIG_LIST configList;
+		SCONFIG configs[2];
+		configList.NumOfParams = 1;
+		configList.ConfigPtr = configs;	
+		std::string value = it->second;
+
+		LOGGER.logWarn("PDUSetComParam", "hMod %u, hCLL %u, ComParamId %u ( %s ), ComParamDataType %u,  ComParamData %u",
+			hMod, hCLL, pParamItem->ComParamId, value.c_str(), pParamItem->ComParamDataType, *(UNUM32*)(pParamItem->pComParamData));
+
+		if (it->second == std::string("CP_Loopback"))
+		{
+			configs[0].Parameter = DATA_RATE;
+			configs[0].Value = *(UNUM32*)(pParamItem->pComParamData);
+			itCLL->second->IoctlSetConfig(configList);
+		}
+		else if (it->second == std::string("CP_Baudrate"))
+		{
+			configs[0].Parameter = LOOPBACK;
+			configs[0].Value = *(UNUM32*)(pParamItem->pComParamData);
+			//itCLL->second->IoctlSetConfig(configList);
+		}
+		else if (it->second == std::string("CP_P2Max"))
+		{
+			configs[0].Parameter = P2_MAX;
+			configs[0].Value = *(UNUM32*)(pParamItem->pComParamData)/ 500;
+			//itCLL->second->IoctlSetConfig(configList);
+		}
+		else if (it->second == std::string("CP_P2Min"))
+		{
+			configs[0].Parameter = P2_MIN;
+			configs[0].Value = *(UNUM32*)(pParamItem->pComParamData)/ 500;
+			//itCLL->second->IoctlSetConfig(configList);
+		}
+		else if (it->second == std::string("CP_P4Max"))
+		{
+			configs[0].Parameter = P4_MAX;
+			configs[0].Value = *(UNUM32*)(pParamItem->pComParamData)/ 500;
+			//itCLL->second->IoctlSetConfig(configList);
+		}
+		else if (it->second == std::string("CP_P4Min"))
+		{
+			configs[0].Parameter = P4_MIN;
+			configs[0].Value = *(UNUM32*)(pParamItem->pComParamData)/500;
+			itCLL->second->IoctlSetConfig(configList);
+		}
+		else if (it->second == std::string("CP_TIdle"))
+		{
+			configs[0].Parameter = TIDLE;
+			configs[0].Value = *(UNUM32*)(pParamItem->pComParamData)/1000;
+			itCLL->second->IoctlSetConfig(configList);
+		}
+		else if (it->second == std::string("CP_TInil"))
+		{
+			configs[0].Parameter = TINIL;
+			configs[0].Value = *(UNUM32*)(pParamItem->pComParamData)/1000;
+			itCLL->second->IoctlSetConfig(configList);
+		}
+		else if (it->second == std::string("CP_TWup"))
+		{
+			configs[0].Parameter = TWUP;
+			configs[0].Value = *(UNUM32*)(pParamItem->pComParamData)/1000;
+			itCLL->second->IoctlSetConfig(configList);
+		}
+	} 
+	else
+	{
+	LOGGER.logWarn("PDUSetComParam", "hMod %u, hCLL %u, ComParamId %u, ComParamDataType %u,  ComParamData %u",
 		hMod, hCLL, pParamItem->ComParamId, pParamItem->ComParamDataType, *(UNUM32*)(pParamItem->pComParamData));
+	}
 	return PDU_STATUS_NOERROR;
 }
 

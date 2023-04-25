@@ -6,6 +6,7 @@
 #include <thread>
 #include <queue>
 #include <mutex>
+#include "j2534/j2534_v0404.h"
 
 class ComLogicalLink
 {
@@ -22,7 +23,7 @@ public:
 
 	UNUM32 StartComPrimitive(UNUM32 CoPType, UNUM32 CoPDataSize, UNUM8* pCoPData, PDU_COP_CTRL_DATA* pCopCtrlData, void* pCoPTag);
 	long StartMsgFilter(unsigned long filterType);
-
+	long IoctlSetConfig(SCONFIG_LIST list);
 	void RegisterEventCallback(CALLBACKFNC cb);
 	bool GetEvent(PDU_EVENT_ITEM* & pEvt);
 	void SignalEvent(PDU_EVENT_ITEM* pEvt);
